@@ -55,3 +55,28 @@ pie(c(n1, nrow(total.greater.than.200) - n1),
     col=c("lightblue","lightgreen"))
 dev.off()
 
+#Inference - Win percentage is more than 75% if the target is above 200
+
+#Top run scorers in overall IPL History
+df %>% 
+  group_by(batsman) %>% 
+  summarise(total.runs = sum(batsman_runs)) %>% 
+  ungroup() %>% 
+  arrange(desc(total.runs)) %>% 
+  head(10) %>% 
+  ggplot(aes(x=batsman,
+             y=total.runs,
+             fill=batsman)) +
+  geom_bar(stat="identity",
+           color="black") +
+  geom_text(aes(label=total.runs,
+                y=total.runs + 300)) +
+  scale_fill_viridis_d() +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, size = 10))
+  
+ggsave(filename = "./EDA/plots/deliveries/Highest run scorers.png", 
+       plot = last_plot(),
+       units = "cm", width = 29, height = 21, dpi = 300)
+
+#Inference - Virat Kohli (GOAT) has the highest runs in IPL
