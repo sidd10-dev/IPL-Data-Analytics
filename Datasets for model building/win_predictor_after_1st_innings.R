@@ -14,7 +14,7 @@ df <- arrange(df,
 #Features Required for Win predictor after 1st innings
 #1. Batting Team in 2nd innings
 #2. Bowling Team in 2nd innings
-#3. Head to Head results
+#3. Head to Head results of chasing team
 #4. Home Ground advantage
 #5. Target
 #6. Batting team points
@@ -25,7 +25,79 @@ df <- arrange(df,
 #11. Defense win percentage of bowling team
 #12. First half average
 
+df %>% 
+  select('venue') %>% 
+  distinct()
+
 #Preparing dataset
 df1 <- df %>% 
   filter(inning == 1) %>% 
-  group_by(match_id)
+  group_by(match_id) %>% 
+  summarise(
+    batting = as.character(bowling_team),
+    bowling = as.character(batting_team),
+    winner = as.character(winner),
+    dl = as.integer(dl_applied),
+    target = sum(total_runs),
+    date = as.Date(date, format="%d-%m-%Y"),
+    city = as.character(city)
+  ) %>% 
+  distinct()
+
+#Head to Head results of chasing team
+head.to.head.wins <- matches %>% 
+  group_by(team1, team2) %>% 
+  mutate(count = n()) %>% 
+  ungroup() %>% 
+  select('team1', 'team2', 'winner', 'count') %>% 
+  group_by(team1, team2, winner) %>% 
+  mutate(count_w = n(),
+         head_to_head = count_w/count) %>% 
+  ungroup() %>% 
+  distinct()
+
+head_to_head_func <- function(df, batting, bowling) {
+  x <- df %>% 
+    filter(team1 == bowling, team2 == batting, winner == batting)
+  if(length(x) == 0) {
+    return(0)
+  } else {
+    return(x$head_to_head[1])
+  }
+}
+
+df1 <- df1 %>% 
+  mutate(head_to_head = head_to_head_func(head.to.head.wins, batting, bowling))
+
+#Home Ground Advantage Chasing team - 1 Defending team - -1 Neutral ground 0
+home.grounds <- matches %>% 
+  group_by(team1, city) %>% 
+  summarise(count = n()) %>% 
+  mutate(home = max(count)) %>% 
+  filter(home == count) %>% 
+  select(team1, city)
+
+#Adding few extra rows manually
+#CSK - ranchi
+#KXIP - mohali
+#GL - Kanpur
+#SRH - vishakapatnam
+#DC - raipur
+manual.home.grounds = data.frame(
+  team1 = c('Sunrisers Hyderabad', 'Delhi Capitals', 'Gujarat Lions', 'Kings XI Punjab', 
+            'Chennai Super Kings'),
+  city = c('Visakhapatnam ', 'Raipur', 'Kanpur', 'Mohali', 'Ranchi')
+)
+
+home.grounds <- rbind(home.grounds, manual.home.grounds)
+#Adding the advantage index to df1
+df1 <- df1 %>% 
+  mutate(home_ground_advantage = case_when(
+    city %in% (home.grounds %>% 
+      filter(team1 == batting) %>% 
+      .$city) ~ 1,
+    city %in% (home.grounds %>% 
+      filter(team1 == bowling) %>% 
+      .$city) ~ -1,
+    T ~ 0
+  ))
