@@ -183,6 +183,11 @@ df1$bowling = transform(team_labs, df1$bowling)
 
 #Winner
 df1$winner = transform(team_labs, df1$winner)
+df1 <- df1 %>% 
+  mutate(winner = case_when(
+    winner == batting ~ 1,
+    winner == bowling ~ 0
+  ))
 
 #Writing Dataset
 df1 %>% 
