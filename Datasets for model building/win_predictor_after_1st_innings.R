@@ -40,7 +40,9 @@ df1 <- df %>%
     dl = as.integer(dl_applied),
     target = sum(total_runs),
     date = as.Date(date, format="%d-%m-%Y"),
-    city = as.character(city)
+    season = as.character(Season),
+    city = as.character(city),
+    ground = as.character(venue)
   ) %>% 
   distinct()
 
@@ -101,3 +103,87 @@ df1 <- df1 %>%
       .$city) ~ -1,
     T ~ 0
   ))
+
+#Batting team points
+#Changing date column to date datatype
+matches <- matches %>% 
+  mutate(date = as.Date(date, format="%d-%m-%Y"))
+
+points_calc <- function(matches, season, win, Date) {
+  pts.w <- matches %>% 
+          filter(Season == season, winner == win, date<Date, result == "normal") %>% 
+          nrow()*2
+  pts.d <- matches %>% 
+    filter(Season == season, (team1 == win | team2 == win),date<Date, result == "tie") %>% 
+    nrow()
+  return(pts.w + pts.d)
+}
+
+df1 <- df1 %>% 
+  mutate(
+    batting_team_points = points_calc(matches, season, batting, date)
+  )
+
+#Bowling points
+df1 <- df1 %>% 
+  mutate(
+    bowling_team_points = points_calc(matches, season, bowling, date)
+  )
+
+#Chase win percentage at the ground
+df1 <- df1 %>% 
+  mutate(
+    chase_win_perc = (
+      matches %>% 
+        filter(venue == ground, winner == batting) %>% 
+        nrow()/nrow(matches %>% 
+                      filter(venue == ground))))
+
+#Chase win percentage of the batting team
+df1 <- df1 %>% 
+  mutate(
+    chase_win_perc_bat = (
+      matches %>% 
+        filter(team2 == batting, winner == batting) %>% 
+        nrow()/nrow(matches %>% 
+                      filter(team2 == batting))
+    )
+  )
+
+#Defense win percentage of the bowling team
+df1 <- df1 %>% 
+  mutate(
+    defense_win_perc_bowl = (
+      matches %>% 
+        filter(team1 == bowling, winner == bowling) %>% 
+        nrow()/nrow(matches %>% 
+                      filter(team1 == bowling))
+    )
+  )
+
+#First half average score in the venue
+df1 <- df1 %>% 
+  group_by(ground) %>% 
+  mutate(first_inng_avg = mean(target)) %>% 
+  ungroup()
+
+#Dropping unwanted columns
+df1 <- df1 %>% 
+  select(-c("date","ground","city","season"))
+
+#Encoding team values
+library(CatEncoders)
+
+#Batting team
+team_labs = LabelEncoder.fit(df1$batting)
+df1$batting = transform(team_labs, df1$batting)
+
+#Bowling team
+df1$bowling = transform(team_labs, df1$bowling)
+
+#Winner
+df1$winner = transform(team_labs, df1$winner)
+
+#Writing Dataset
+df1 %>% 
+  write.csv(., file='./Datasets for model building/first_innings.csv', row.names = F)
